@@ -43,7 +43,7 @@ else:
     raise ValueError('Currently support CUDA only.')
 
 # load photoai
-config_path = 'options/PhotoAI_v0_tiled.yaml'
+config_path = 'options/PhotoAI_tiled.yaml'
 config = OmegaConf.load(config_path)
 model = create_photoai_model(config_path, photoai_sign='Q')
 if args.loading_half_params:
@@ -53,7 +53,7 @@ if args.use_tile_vae:
 model = model.to(SUPIR_device)
 model.first_stage_model.denoise_encoder_s1 = copy.deepcopy(model.first_stage_model.denoise_encoder)
 model.current_model = 'v0-Q'
-ckpt_Q, ckpt_F = load_QF_ckpt('options/PhotoAI_v0.yaml')
+ckpt_Q, ckpt_F = load_QF_ckpt('options/PhotoAI.yaml')
 
 tile_size = config.model.params.sampler_config.params.tile_size * 8
 tile_stride = config.model.params.sampler_config.params.tile_stride * 8

@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--opt", type=str, default='options/PhotoAI_v0.yaml')
+parser.add_argument("--opt", type=str, default='options/PhotoAI.yaml')
 parser.add_argument("--ip", type=str, default='127.0.0.1')
 parser.add_argument("--port", type=int, default='6688')
 parser.add_argument("--no_llava", action='store_true', default=True)

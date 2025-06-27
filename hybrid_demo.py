@@ -2,14 +2,13 @@
 """
 Hybrid Gradio Demo: Modern UI from imageai/update + Working photoai functions
 """
-import os
 import logging
 import traceback
 import sys
 import argparse
 import time
 import copy
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 
 import gradio as gr
 import torch
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Import and apply OpenCLIP patches - this must be done EARLY
 try:
-    from openclip_patch import apply_all_openclip_patches
+    from photoai.utils.openclip_patch import apply_all_openclip_patches
 
     logger.info("OpenCLIP patch module imported successfully")
 except ImportError as e:
@@ -584,7 +583,7 @@ def create_parser():
     # Server options
     parser.add_argument("--ip", type=str, default='127.0.0.1')
     parser.add_argument("--port", type=int, default=6688)
-    parser.add_argument("--opt", type=str, default='options/PhotoAI_v0.yaml')
+    parser.add_argument("--opt", type=str, default='options/PhotoAI.yaml')
 
     # Model options
     parser.add_argument("--no_llava", action='store_true', default=False)
