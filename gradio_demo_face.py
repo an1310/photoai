@@ -6,7 +6,7 @@ import argparse
 from photoai.util import HWC3, upscale_image, fix_resize, convert_dtype
 import numpy as np
 import torch
-from photoai.util import create_SUPIR_model, load_QF_ckpt
+from photoai.util import create_photoai_model, load_QF_ckpt
 from PIL import Image
 from llava.llava_agent import LLavaAgent
 from CKPT_PTH import LLAVA_MODEL_PATH
@@ -41,9 +41,9 @@ else:
     raise ValueError('Currently support CUDA only.')
 
 # load photoai
-config_path = 'options/SUPIR_v0.yaml'
+config_path = 'options/PhotoAI_v0.yaml'
 config = OmegaConf.load(config_path)
-model = create_SUPIR_model(config_path, SUPIR_sign='Q')
+model = create_photoai_model(config_path, photoai_sign='Q')
 if args.loading_half_params:
     model = model.half()
 if args.use_tile_vae:
@@ -51,7 +51,7 @@ if args.use_tile_vae:
 model = model.to(SUPIR_device)
 model.first_stage_model.denoise_encoder_s1 = copy.deepcopy(model.first_stage_model.denoise_encoder)
 model.current_model = 'v0-Q'
-ckpt_Q, ckpt_F = load_QF_ckpt('options/SUPIR_v0.yaml')
+ckpt_Q, ckpt_F = load_QF_ckpt('options/PhotoAI_v0.yaml')
 
 # load LLaVA
 if use_llava:

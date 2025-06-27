@@ -31,7 +31,7 @@ def create_model(config_path):
     return model
 
 
-def create_SUPIR_model(config_path, SUPIR_sign=None, load_default_setting=False):
+def create_photoai_model(config_path, photoai_sign=None, load_default_setting=False):
     config = OmegaConf.load(config_path)
     model = instantiate_from_config(config.model).cpu()
     print(f'Loaded model config from [{config_path}]')
@@ -39,11 +39,11 @@ def create_SUPIR_model(config_path, SUPIR_sign=None, load_default_setting=False)
         model.load_state_dict(load_state_dict(config.SDXL_CKPT), strict=False)
     if config.SUPIR_CKPT is not None:
         model.load_state_dict(load_state_dict(config.SUPIR_CKPT), strict=False)
-    if SUPIR_sign is not None:
-        assert SUPIR_sign in ['F', 'Q']
-        if SUPIR_sign == 'F':
+    if photoai_sign is not None:
+        assert photoai_sign in ['F', 'Q']
+        if photoai_sign == 'F':
             model.load_state_dict(load_state_dict(config.SUPIR_CKPT_F), strict=False)
-        elif SUPIR_sign == 'Q':
+        elif photoai_sign == 'Q':
             model.load_state_dict(load_state_dict(config.SUPIR_CKPT_Q), strict=False)
     if load_default_setting:
         default_setting = config.default_setting

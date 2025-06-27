@@ -1,6 +1,6 @@
 import torch.cuda
 import argparse
-from photoai.util import create_SUPIR_model, PIL2Tensor, Tensor2PIL, convert_dtype
+from photoai.util import create_photoai_model, PIL2Tensor, Tensor2PIL, convert_dtype
 from PIL import Image
 from llava.llava_agent import LLavaAgent
 from CKPT_PTH import LLAVA_MODEL_PATH
@@ -59,7 +59,7 @@ print(args)
 use_llava = not args.no_llava
 
 # load photoai
-model = create_SUPIR_model('options/SUPIR_v0.yaml', SUPIR_sign=args.SUPIR_sign)
+model = create_photoai_model('options/PhotoAI_v0.yaml', photoai_sign=args.SUPIR_sign)
 if args.loading_half_params:
     model = model.half()
 if args.use_tile_vae:
