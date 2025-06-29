@@ -73,8 +73,9 @@ class UnifiedPhotoAIDemo(ImageAIDemoBase):
                        upscale_factor, num_steps, guidance_scale, control_scale, seed,
                        color_fix_type, use_linear_cfg=False, guidance_scale_min=4.0,
                        enable_tiling=None, tile_size=None, tile_stride=None,
-                       restoration_scale=4.0, s_churn=0.0, s_noise=1.003, photoai_checkpoint="Q"):
-        """Stage 2 processing with optional tiling - compatible with PhotoAI"""
+                       restoration_scale=4.0, s_churn=0.0, s_noise=1.003, photoai_checkpoint="Q",
+                       enable_multipass=False, num_passes=2):
+        """Stage 2 processing with optional tiling and multi-pass - compatible with PhotoAI"""
 
         if input_image is None:
             return [], "No input image provided"
@@ -128,7 +129,9 @@ class UnifiedPhotoAIDemo(ImageAIDemoBase):
             'restoration_scale': restoration_scale,
             's_churn': s_churn,
             's_noise': s_noise,
-            'photoai_checkpoint': photoai_checkpoint
+            'photoai_checkpoint': photoai_checkpoint,
+            'enable_multipass': enable_multipass,
+            'num_passes': num_passes
         }
 
         try:
@@ -162,60 +165,134 @@ class UnifiedPhotoAIDemo(ImageAIDemoBase):
             if hasattr(self.model, 'model') and hasattr(self.model.model, 'dtype'):
                 self.model.model.dtype = torch.float32
 
-            # Process with model using PhotoAI interface
-            with torch.no_grad():
-                if self.enable_tiling and hasattr(self.model, 'batchify_sample_tiled'):
-                    # Use tiled processing if available
-                    samples = self.model.batchify_sample_tiled(
-                        LQ, captions,
-                        num_steps=num_steps,
-                        restoration_scale=restoration_scale,  # Now configurable
-                        s_churn=s_churn,  # Now configurable
-                        s_noise=s_noise,  # Now configurable
-                        cfg_scale=guidance_scale,
-                        control_scale=control_scale,
-                        seed=seed,
-                        num_samples=num_samples,
-                        p_p=a_prompt,
-                        n_p=n_prompt,
-                        color_fix_type=color_fix_type,
-                        use_linear_CFG=use_linear_cfg,
-                        use_linear_control_scale=False,
-                        cfg_scale_start=guidance_scale,
-                        control_scale_start=control_scale,
-                        tile_size=self.tile_size,
-                        tile_stride=self.tile_stride
-                    )
-                else:
-                    # Standard PhotoAI processing
-                    samples = self.model.batchify_sample(
-                        LQ, captions,
-                        num_steps=num_steps,
-                        restoration_scale=restoration_scale,  # Now configurable
-                        s_churn=s_churn,  # Now configurable
-                        s_noise=s_noise,  # Now configurable
-                        cfg_scale=guidance_scale,
-                        control_scale=control_scale,
-                        seed=seed,
-                        num_samples=num_samples,
-                        p_p=a_prompt,
-                        n_p=n_prompt,
-                        color_fix_type=color_fix_type,
-                        use_linear_CFG=use_linear_cfg,
-                        use_linear_control_scale=False,
-                        cfg_scale_start=guidance_scale,
-                        control_scale_start=control_scale
-                    )
+            # Multi-pass processing
+            if enable_multipass and num_passes > 1:
+                print(f"🔄 Multi-pass processing: {num_passes} passes")
+
+                # Progressive enhancement strategy
+                current_image = LQ
+
+                for pass_num in range(num_passes):
+                    print(f"  Pass {pass_num + 1}/{num_passes}")
+
+                    # Adjust parameters for each pass
+                    pass_restoration = restoration_scale * (0.4 + 0.6 * (pass_num + 1) / num_passes)
+
+                    # Process this pass
+                    with torch.no_grad():
+                        if self.enable_tiling and hasattr(self.model, 'batchify_sample_tiled'):
+                            samples = self.model.batchify_sample_tiled(
+                                current_image, captions,
+                                num_steps=num_steps,
+                                restoration_scale=pass_restoration,
+                                s_churn=s_churn,
+                                s_noise=s_noise,
+                                cfg_scale=guidance_scale,
+                                control_scale=control_scale,
+                                seed=seed if pass_num == 0 else -1,  # Only use seed on first pass
+                                num_samples=num_samples,
+                                p_p=a_prompt,
+                                n_p=n_prompt,
+                                color_fix_type=color_fix_type,
+                                use_linear_CFG=use_linear_cfg,
+                                use_linear_control_scale=False,
+                                cfg_scale_start=guidance_scale,
+                                control_scale_start=control_scale,
+                                tile_size=self.tile_size,
+                                tile_stride=self.tile_stride
+                            )
+                        else:
+                            samples = self.model.batchify_sample(
+                                current_image, captions,
+                                num_steps=num_steps,
+                                restoration_scale=pass_restoration,
+                                s_churn=s_churn,
+                                s_noise=s_noise,
+                                cfg_scale=guidance_scale,
+                                control_scale=control_scale,
+                                seed=seed if pass_num == 0 else -1,
+                                num_samples=num_samples,
+                                p_p=a_prompt,
+                                n_p=n_prompt,
+                                color_fix_type=color_fix_type,
+                                use_linear_CFG=use_linear_cfg,
+                                use_linear_control_scale=False,
+                                cfg_scale_start=guidance_scale,
+                                control_scale_start=control_scale
+                            )
+
+                    # Prepare for next pass (convert back to tensor if needed)
+                    if pass_num < num_passes - 1:
+                        if isinstance(samples, torch.Tensor):
+                            current_image = samples
+                        else:
+                            # Convert numpy back to tensor if needed
+                            if isinstance(samples, list):
+                                samples_array = np.array(samples[0]) if samples else current_image.cpu().numpy()
+                            else:
+                                samples_array = samples
+                            samples_normalized = (samples_array.astype(
+                                np.float32) / 255.0) * 2.0 - 1.0  # Back to [-1,1]
+                            current_image = torch.tensor(samples_normalized, dtype=torch.float32).permute(2, 0,
+                                                                                                          1).unsqueeze(
+                                0).to(self.imageai_device)
+
+                # Use final pass result
+                final_samples = samples
+
+            else:
+                # Single pass processing (original logic)
+                with torch.no_grad():
+                    if self.enable_tiling and hasattr(self.model, 'batchify_sample_tiled'):
+                        final_samples = self.model.batchify_sample_tiled(
+                            LQ, captions,
+                            num_steps=num_steps,
+                            restoration_scale=restoration_scale,
+                            s_churn=s_churn,
+                            s_noise=s_noise,
+                            cfg_scale=guidance_scale,
+                            control_scale=control_scale,
+                            seed=seed,
+                            num_samples=num_samples,
+                            p_p=a_prompt,
+                            n_p=n_prompt,
+                            color_fix_type=color_fix_type,
+                            use_linear_CFG=use_linear_cfg,
+                            use_linear_control_scale=False,
+                            cfg_scale_start=guidance_scale,
+                            control_scale_start=control_scale,
+                            tile_size=self.tile_size,
+                            tile_stride=self.tile_stride
+                        )
+                    else:
+                        final_samples = self.model.batchify_sample(
+                            LQ, captions,
+                            num_steps=num_steps,
+                            restoration_scale=restoration_scale,
+                            s_churn=s_churn,
+                            s_noise=s_noise,
+                            cfg_scale=guidance_scale,
+                            control_scale=control_scale,
+                            seed=seed,
+                            num_samples=num_samples,
+                            p_p=a_prompt,
+                            n_p=n_prompt,
+                            color_fix_type=color_fix_type,
+                            use_linear_CFG=use_linear_cfg,
+                            use_linear_control_scale=False,
+                            cfg_scale_start=guidance_scale,
+                            control_scale_start=control_scale
+                        )
 
             # Convert results to list of numpy arrays
-            if isinstance(samples, torch.Tensor):
-                samples_np = samples.detach().cpu().float().numpy()
+            if isinstance(final_samples, torch.Tensor):
+                samples_np = final_samples.detach().cpu().float().numpy()
                 samples_np = (samples_np + 1.0) / 2.0  # Denormalize from [-1,1] to [0,1]
                 samples_np = samples_np.transpose(0, 2, 3, 1)  # BCHW to BHWC
                 samples_np = (samples_np * 255.0).round().clip(0, 255).astype(np.uint8)
                 results = [samples_np[i] for i in range(samples_np.shape[0])]
             else:
-                results = samples  # Assume already in correct format
+                results = final_samples  # Assume already in correct format
 
             # Log event
             self.log_event(event_dict)
@@ -267,6 +344,21 @@ class UnifiedPhotoAIDemo(ImageAIDemoBase):
                                 )
 
                                 gr.Markdown("---")
+                                gr.Markdown("**Multi-Pass Enhancement**")
+
+                                with gr.Row():
+                                    enable_multipass = gr.Checkbox(
+                                        value=False,
+                                        label="Enable Multi-Pass Processing",
+                                        info="Process image multiple times for dramatic enhancement"
+                                    )
+                                    num_passes = gr.Slider(
+                                        1, 4, value=2, step=1,
+                                        label="Number of Passes",
+                                        info="More passes = more dramatic results"
+                                    )
+
+                                gr.Markdown("---")
                                 gr.Markdown("**PhotoAI Enhancement Parameters**")
 
                                 with gr.Row():
@@ -295,6 +387,12 @@ class UnifiedPhotoAIDemo(ImageAIDemoBase):
 
                                 with gr.Accordion("💡 Enhancement Tips", open=False):
                                     gr.Markdown("""
+                                    **Multi-Pass Processing:**
+                                    - **2 Passes:** Conservative progressive enhancement
+                                    - **3+ Passes:** Dramatic transformation for heavily damaged images
+                                    - Each pass builds on the previous result
+                                    - Safer than single extreme settings
+
                                     **For Dramatic Results:**
                                     - **Restoration Scale 6-8:** Very aggressive enhancement
                                     - **S-Churn 0.5-1.0:** Adds detail variation  
@@ -330,7 +428,8 @@ class UnifiedPhotoAIDemo(ImageAIDemoBase):
                             components['guidance_scale'], components['control_scale'], components['seed'],
                             components['color_fix_type'], use_linear_cfg, guidance_scale_min,
                             components['enable_tiling'], components['tile_size'], components['tile_stride'],
-                            restoration_scale, s_churn, s_noise, photoai_checkpoint
+                            restoration_scale, s_churn, s_noise, photoai_checkpoint,
+                            enable_multipass, num_passes
                         ],
                         outputs=[result_gallery, event_id_output]
                     )
@@ -486,6 +585,11 @@ class UnifiedPhotoAIDemo(ImageAIDemoBase):
                     - **≤2K images:** Tiling usually not needed
                     - **2K-4K images:** Enable tiling for safety
                     - **≥4K images:** Always use tiling + tiled VAE
+
+                    **🔄 Multi-Pass Processing:**
+                    - **2 Passes:** Good for moderate enhancement
+                    - **3 Passes:** Dramatic results for old/damaged photos
+                    - **4 Passes:** Maximum enhancement for severely degraded images
                     """
 
                     gr.Markdown(tips)
@@ -506,7 +610,7 @@ class UnifiedPhotoAIDemo(ImageAIDemoBase):
             server_port=self.args.port,
             share=True,
             show_error=True,
-            inbrowser=False,
+            inbrowser=False
         )
 
 
@@ -549,7 +653,7 @@ def main():
             except Exception as e:
                 print(f"⚠️ Could not detect VRAM: {e}")
 
-    print("🚀 Starting Unified PhotoAI Demo...")
+    print("🚀 Starting PhotoAI Demo...")
     print(f"📋 Model variant: {args.model_variant}")
     print(f"📄 Config: {get_config_path(args.model_variant)}")
 
