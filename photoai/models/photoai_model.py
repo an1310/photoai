@@ -1,15 +1,17 @@
-import torch
-from sgm.models.diffusion import DiffusionEngine
-from sgm.util import instantiate_from_config
 import copy
-from sgm.modules.distributions.distributions import DiagonalGaussianDistribution
 import random
-from photoai.utils.colorfix import wavelet_reconstruction, adaptive_instance_normalization
-from pytorch_lightning import seed_everything
-from torch.nn.functional import interpolate
-from photoai.utils.tilevae import VAEHook
 
-class SUPIRModel(DiffusionEngine):
+import torch
+from pytorch_lightning import seed_everything
+
+from photoai.utils.colorfix import wavelet_reconstruction, adaptive_instance_normalization
+from photoai.utils.tilevae import VAEHook
+from sgm.models.diffusion import DiffusionEngine
+from sgm.modules.distributions.distributions import DiagonalGaussianDistribution
+from sgm.util import instantiate_from_config
+
+
+class PhotoAIModel(DiffusionEngine):
     def __init__(self, control_stage_config, ae_dtype='fp32', diffusion_dtype='fp32', p_p='', n_p='', *args, **kwargs):
         super().__init__(*args, **kwargs)
         control_model = instantiate_from_config(control_stage_config)
@@ -182,12 +184,12 @@ class SUPIRModel(DiffusionEngine):
 if __name__ == '__main__':
     from photoai.util import create_model, load_state_dict
 
-    model = create_model('../../options/dev/SUPIR_paper_version.yaml')
+    model = create_model('../../options/dev/photoai_paper_version.yaml')
 
     SDXL_CKPT = '/opt/data/private/AIGC_pretrain/SDXL_cache/sd_xl_base_1.0_0.9vae.safetensors'
-    SUPIR_CKPT = '/opt/data/private/AIGC_pretrain/SUPIR_cache/photoai-paper.ckpt'
+    PHOTO_AI_CKPT = '/opt/data/private/AIGC_pretrain/photoai_cache/photoai-paper.ckpt'
     model.load_state_dict(load_state_dict(SDXL_CKPT), strict=False)
-    model.load_state_dict(load_state_dict(SUPIR_CKPT), strict=False)
+    model.load_state_dict(load_state_dict(PHOTO_AI_CKPT), strict=False)
     model = model.cuda()
 
     x = torch.randn(1, 3, 512, 512).cuda()

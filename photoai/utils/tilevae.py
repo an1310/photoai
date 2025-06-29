@@ -47,14 +47,6 @@
 #       - When need to go to the next tile, the current tile is send to cpu.
 #   4) After all tiles are processed, tiles are merged on cpu and return.
 #
-#   Enjoy!
-#
-#   @author: LI YI @ Nanyang Technological University - Singapore
-#   @date: 2023-03-02
-#   @license: MIT License
-#
-#   Please give me a star if you like this project!
-#
 # -------------------------------------------------------------------------
 
 import gc

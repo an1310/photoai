@@ -1,36 +1,28 @@
-# from einops._torch_specific import allow_ops_in_compiled_graph
-# allow_ops_in_compiled_graph()
-import einops
+from functools import partial
+
 import torch
 import torch as th
 import torch.nn as nn
-from einops import rearrange, repeat
+from einops import rearrange
 
+from sgm.modules.attention import SpatialTransformer, MemoryEfficientCrossAttention, CrossAttention
+from sgm.modules.diffusionmodules.openaimodel import Downsample, Upsample, UNetModel, Timestep, \
+    TimestepEmbedSequential, ResBlock, AttentionBlock, TimestepBlock
 from sgm.modules.diffusionmodules.util import (
-    avg_pool_nd,
-    checkpoint,
     conv_nd,
     linear,
     normalization,
     timestep_embedding,
     zero_module,
 )
-
-from sgm.modules.diffusionmodules.openaimodel import Downsample, Upsample, UNetModel, Timestep, \
-    TimestepEmbedSequential, ResBlock, AttentionBlock, TimestepBlock
-from sgm.modules.attention import SpatialTransformer, MemoryEfficientCrossAttention, CrossAttention
-from sgm.util import default, log_txt_as_img, exists, instantiate_from_config
-import re
-import torch
-from functools import partial
-
+from sgm.util import default, exists, instantiate_from_config
 
 try:
     import xformers
     import xformers.ops
-    XFORMERS_IS_AVAILBLE = True
+    XFORMERS_IS_AVAILABLE = True
 except:
-    XFORMERS_IS_AVAILBLE = False
+    XFORMERS_IS_AVAILABLE = False
 
 
 # dummy replace
@@ -121,7 +113,7 @@ class ZeroCrossAttn(nn.Module):
 
     def __init__(self, context_dim, query_dim, zero_out=True, mask=False):
         super().__init__()
-        attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
+        attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILABLE else "softmax"
         assert attn_mode in self.ATTENTION_MODES
         attn_cls = self.ATTENTION_MODES[attn_mode]
         self.attn = attn_cls(query_dim=query_dim, context_dim=context_dim, heads=query_dim//64, dim_head=64)
@@ -195,12 +187,12 @@ class GLVControl(nn.Module):
         if use_spatial_transformer:
             assert (
                 context_dim is not None
-            ), "Fool!! You forgot to include the dimension of your cross-attention conditioning..."
+            ), "You forgot to include the dimension of your cross-attention conditioning..."
 
         if context_dim is not None:
             assert (
                 use_spatial_transformer
-            ), "Fool!! You forgot to use the spatial transformer for your cross-attention conditioning..."
+            ), "You forgot to use the spatial transformer for your cross-attention conditioning..."
             if type(context_dim) == ListConfig:
                 context_dim = list(context_dim)
 
@@ -685,7 +677,7 @@ if __name__ == '__main__':
 
     # base
     with torch.no_grad():
-        opt = OmegaConf.load('../../options/dev/SUPIR_tmp.yaml')
+        opt = OmegaConf.load('../../options/dev/photoai_tmp.yaml')
 
         model = instantiate_from_config(opt.model.params.control_stage_config)
         model = model.cuda()
