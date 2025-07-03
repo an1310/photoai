@@ -32,7 +32,7 @@ from ...util import (
     instantiate_from_config,
 )
 
-from CKPT_PTH import SDXL_CLIP1_PATH, SDXL_CLIP2_CKPT_PTH
+from photoai.utils.checkpoints import SDXL_CLIP1_PATH, SDXL_CLIP2_CKPT_PTH
 
 class AbstractEmbModel(nn.Module):
     def __init__(self):

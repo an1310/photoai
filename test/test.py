@@ -3,20 +3,18 @@ import argparse
 from photoai.util import create_photoai_model, PIL2Tensor, Tensor2PIL, convert_dtype
 from PIL import Image
 from llava.llava_agent import LLavaAgent
-from CKPT_PTH import LLAVA_MODEL_PATH
+from photoai.utils.checkpoints import LLAVA_MODEL_PATH
 import os
-from torch.nn.functional import interpolate
 
 if torch.cuda.device_count() >= 2:
-    SUPIR_device = 'cuda:0'
-    LLaVA_device = 'cuda:1'
+    photoai_device = 'cuda:0'
+    llava_device = 'cuda:1'
 elif torch.cuda.device_count() == 1:
-    SUPIR_device = 'cuda:0'
-    LLaVA_device = 'cuda:0'
+    photoai_device = 'cuda:0'
+    llava_device = 'cuda:0'
 else:
-    raise ValueError('Currently support CUDA only.')
+    raise ValueError('Currently only supports CUDA.')
 
-# hyparams here
 parser = argparse.ArgumentParser()
 parser.add_argument("--img_dir", type=str)
 parser.add_argument("--save_dir", type=str)
@@ -59,17 +57,17 @@ print(args)
 use_llava = not args.no_llava
 
 # load photoai
-model = create_photoai_model('options/PhotoAI.yaml', photoai_sign=args.SUPIR_sign)
+model = create_photoai_model('../options/PhotoAI.yaml', photoai_sign=args.SUPIR_sign)
 if args.loading_half_params:
     model = model.half()
 if args.use_tile_vae:
     model.init_tile_vae(encoder_tile_size=args.encoder_tile_size, decoder_tile_size=args.decoder_tile_size)
 model.ae_dtype = convert_dtype(args.ae_dtype)
 model.model.dtype = convert_dtype(args.diff_dtype)
-model = model.to(SUPIR_device)
+model = model.to(photoai_device)
 # load LLaVA
 if use_llava:
-    llava_agent = LLavaAgent(LLAVA_MODEL_PATH, device=LLaVA_device, load_8bit=args.load_8bit_llava, load_4bit=False)
+    llava_agent = LLavaAgent(LLAVA_MODEL_PATH, device=llava_device, load_8bit=args.load_8bit_llava, load_4bit=False)
 else:
     llava_agent = None
 
@@ -79,11 +77,11 @@ for img_pth in os.listdir(args.img_dir):
 
     LQ_ips = Image.open(os.path.join(args.img_dir, img_pth))
     LQ_img, h0, w0 = PIL2Tensor(LQ_ips, upsacle=args.upscale, min_size=args.min_size)
-    LQ_img = LQ_img.unsqueeze(0).to(SUPIR_device)[:, :3, :, :]
+    LQ_img = LQ_img.unsqueeze(0).to(photoai_device)[:, :3, :, :]
 
     # step 1: Pre-denoise for LLaVA, resize to 512
     LQ_img_512, h1, w1 = PIL2Tensor(LQ_ips, upsacle=args.upscale, min_size=args.min_size, fix_resize=512)
-    LQ_img_512 = LQ_img_512.unsqueeze(0).to(SUPIR_device)[:, :3, :, :]
+    LQ_img_512 = LQ_img_512.unsqueeze(0).to(photoai_device)[:, :3, :, :]
     clean_imgs = model.batchify_denoise(LQ_img_512)
     clean_PIL_img = Tensor2PIL(clean_imgs[0], h1, w1)
 
