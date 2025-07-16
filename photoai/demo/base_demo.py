@@ -368,6 +368,31 @@ class ImageAIDemoBase(ABC):
             print(error_msg)
             return {"error": error_msg, "success": False}
 
+    @staticmethod
+    def fix_dimensions(image):
+        """Fix image dimensions for PhotoAI compatibility"""
+        if isinstance(image, np.ndarray):
+            # Convert numpy to PIL for resizing
+            pil_image = Image.fromarray(image)
+        else:
+            pil_image = image
+
+        w, h = pil_image.size
+
+        # Round up to nearest multiple of 16
+        new_w = ((w + 15) // 16) * 16
+        new_h = ((h + 15) // 16) * 16
+
+        if new_w != w or new_h != h:
+            print(f"📐 Resizing for tensor compatibility: {w}×{h} → {new_w}×{new_h}")
+            pil_image = pil_image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+        # Convert back to numpy if that's what was passed in
+        if isinstance(image, np.ndarray):
+            return np.array(pil_image)
+
+        return pil_image
+
     def create_common_interface_components(self):
         """Create common Gradio interface components used across all demos"""
 
