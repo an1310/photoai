@@ -1,5 +1,5 @@
 model:
-  target: photoai.models.SUPIR_model.SUPIRModel
+  target: photoai.models.photoai_model.PhotoAIModel
   params:
     ae_dtype: bf16
     diffusion_dtype: fp16
@@ -19,7 +19,7 @@ model:
           target: sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization
 
     control_stage_config:
-      target: photoai.modules.SUPIR_v0.GLVControl
+      target: photoai.modules.photoai_modules.GLVControl
       params:
         adm_in_channels: 2816
         num_classes: sequential
@@ -41,7 +41,7 @@ model:
         input_upscale: 1
 
     network_config:
-      target: photoai.modules.SUPIR_v0.LightGLVUNet
+      target: photoai.modules.photoai_modules.LightGLVUNet
       params:
         mode: XL-base
         project_type: ZeroSFT

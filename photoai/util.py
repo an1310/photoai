@@ -101,17 +101,30 @@ def HWC3(x):
     assert x.ndim == 3
     H, W, C = x.shape
     assert C == 1 or C == 3 or C == 4
+
+    # Handle color channels first
+    result = np.empty((H, W, C))
     if C == 3:
-        return x
-    if C == 1:
-        return np.concatenate([x, x, x], axis=2)
-    if C == 4:
+        result = x
+    elif C == 1:
+        result = np.concatenate([x, x, x], axis=2)
+    elif C == 4:
         color = x[:, :, 0:3].astype(np.float32)
         alpha = x[:, :, 3:4].astype(np.float32) / 255.0
         y = color * alpha + 255.0 * (1.0 - alpha)
-        y = y.clip(0, 255).astype(np.uint8)
-        return y
+        result = y.clip(0, 255).astype(np.uint8)
 
+    # Fix dimensions for PhotoAI compatibility (must be divisible by 16)
+    H, W = result.shape[:2]
+    new_H = ((H + 63) // 64) * 64  # Round up to nearest 64
+    new_W = ((W + 63) // 64) * 64  # Round up to nearest 64
+
+    if new_H != H or new_W != W:
+        print(f"📐 Auto-fixing dimensions for PhotoAI: {W}×{H} → {new_W}×{new_H}")
+        import cv2
+        result = cv2.resize(result, (new_W, new_H), interpolation=cv2.INTER_LANCZOS4)
+
+    return result
 
 def upscale_image(input_image, upscale, min_size=None, unit_resolution=64):
     H, W, C = input_image.shape
